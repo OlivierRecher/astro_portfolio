@@ -1,0 +1,38 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  overflow: hidden;
+}
+
+.ticker {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 50px;
+  background-color: #fff;
+  margin: 0 auto;
+  width: 50%;
+}
+
+.ticker__list {
+  display: flex;
+  position: relative;
+  left: 100%;
+  margin-top: 20px;
+  animation: ticker 10s infinite linear;
+}
+.ticker__item {
+  margin-right: 20px;
+  font-size: 20px;
+  font-weight: bold;
+  color: #07042f;
+  white-space: nowrap;
+}
+  
+@keyframes ticker {
+  100% {
+    transform: translateX(-100%);
+  }
+}
