@@ -1,18 +1,23 @@
 ---
-import Layout from '../layouts/Layout.astro';
-import Ticker from '../components/Ticker.jsx';
+import Layout from "../layouts/Layout.astro";
+import Ticker from "../components/Ticker.jsx";
 ---
 
 <Layout title="Portfolio - Olivier Recher">
-	
-	<div class="relative mt-[10%]">
-		<h4 class="text-center text-xl font-semibold">Hello ! I am Olivier,</h4>
-		<h1 class="text-center text-9xl font-bold">Full-stack</h1>
-		<h1 class="text-center text-9xl font-bold">Developper</h1>
-		<Ticker client:only />
-	</div>
-
+  <div class="relative mt-[10%] text-[#07042f] dark:text-white dark:opacity-80">
+    <h4 class="text-center text-xl font-semibold">
+      Hello ! I am <span class="text-[#6200ee] dark:text-[#bb86FC]"
+        >Olivier</span
+      >,
+    </h4>
+    <h1 class="text-center text-9xl font-bold">Full-stack</h1>
+    <h1
+      class="text-center text-9xl font-bold text-[#6200ee] dark:text-[#bb86FC]"
+    >
+      Developper
+    </h1>
+    <Ticker client:only />
+  </div>
 </Layout>
 
-<style>
-</style>
+<style></style>
