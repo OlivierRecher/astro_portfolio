@@ -1,0 +1,34 @@
+---
+export const client = "load";
+---
+
+<script type="module" is:inline>
+  import { Canva } from "./doodle/model/Canva.js";
+  import { Controller } from "./doodle/controller/Controller.js";
+  const autopilotButton = document.getElementById("autopilotButton");
+  const canvas = document.getElementById("my_canvas");
+  canvas.width = Canva.WIDTH;
+  canvas.height = Canva.HEIGHT;
+
+  async function loadData() {
+    const response = await fetch("/src/assets/doodle/data.json");
+    return await response.json();
+  }
+  const data = await loadData();
+
+  const HEXTILES_IMAGE = new Image();
+  HEXTILES_IMAGE.src = "/src/assets/doodle/game-tiles.png";
+  Promise.all([
+    new Promise((resolve) => {
+      HEXTILES_IMAGE.addEventListener("load", () => resolve());
+    }),
+  ]).then(() => {
+    const app = new Controller(HEXTILES_IMAGE, data);
+    app.update();
+
+    autopilotButton.addEventListener("click", () => {
+      app.toggleAutopilot(!app.isAutopilot());
+      autopilotButton.innerText = app.isAutopilot() ? "Manual" : "AutoPilote";
+    });
+  });
+</script>

@@ -1,0 +1,29 @@
+---
+import "./style.css";
+import Doodle from "@components/Doodle.astro";
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  </head>
+  <body>
+    <div class="page">
+      <h1 class="title">Goofle</h1>
+      <canvas id="my_canvas"></canvas>
+      <div class="buttons">
+        <button class="button" id="autopilotButton">Autopilote</button>
+        <button
+          class="button"
+          id="train"
+          onclick="window.location.href='/project/doodle/train'"
+          >Entrainement</button
+        >
+      </div>
+    </div>
+
+    <Doodle />
+  </body>
+</html>
