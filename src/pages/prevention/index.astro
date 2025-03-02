@@ -1,0 +1,254 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Calculateur d'alcoolémie</title>
+    <script
+      is:inline
+      src="https://www.gstatic.com/charts/loader.js"
+      onload="google.charts.load('current', {'packages':['corechart']});"
+    ></script>
+  </head>
+  <body class="justify-center items-center">
+    <h1 class="text-6xl">Calculateur d'alcoolémie</h1>
+
+    <!-- Formulaire utilisateur -->
+    <form id="userForm" class="mb-5">
+      <label for="sex" class="inline-block w-60 mb-2">Sexe :</label>
+      <select id="sex" class="p-1">
+        <option value="male">Homme</option>
+        <option value="female">Femme</option>
+      </select>
+      <br />
+      <label for="weight" class="inline-block w-60 mb-2">Poids (kg) :</label>
+      <input
+        type="number"
+        id="weight"
+        required
+        class="border border-gray-400 rounded-xl bg-transparent p-4 text-xl transition duration-150 ease-in-out"
+      />
+      <br />
+      <div>
+        <label for="mealQuality" class="inline-block w-60 mb-2"
+          >Qualité du repas:</label
+        >
+        <select id="mealQuality" class="p-1">
+          <option value="1">1</option>
+          <option value="2">2</option>
+          <option value="3">3</option>
+          <option value="4">4</option>
+        </select>
+      </div>
+      <label> (1: pas manger, 4: très bien manger) </label>
+    </form>
+
+    <div class="m-5">
+      <button
+        id="addUnitButton"
+        class="cursor-pointer
+      bg-red-600
+      text-white
+      font-bold
+      text-center
+      py-10
+      px-5"
+        >Ajouter une unité d'alcool (10 g)</button
+      >
+    </div>
+
+    <div class="history mb-5">
+      <h3>Historique de consommation :</h3>
+      <ul id="historyList"></ul>
+    </div>
+
+    <div class="buttons">
+      <button id="calculateButton" class="cursor-pointer"
+        >Calculer le tableau BAC par quart d'heure</button
+      >
+    </div>
+
+    <div class="chartContent">
+      <div id="chart"></div>
+    </div>
+
+    <script type="module">
+      /** UTILS*/
+      function formatTime(date) {
+        let hours = date.getHours().toString().padStart(2, "0");
+        let minutes = date.getMinutes().toString().padStart(2, "0");
+        return `${hours}h${minutes}`;
+      }
+
+      function roundDownToPreviousQuarter(date) {
+        const newDate = new Date(date.getTime());
+        newDate.setSeconds(0, 0);
+        const minutes = newDate.getMinutes();
+        const remainder = minutes % 15;
+        newDate.setMinutes(minutes - remainder);
+        return newDate;
+      }
+      /** */
+
+      const startTime = new Date();
+
+      const consumptionHistory = [];
+
+      const sexInput = document.getElementById("sex");
+      const weightInput = document.getElementById("weight");
+      const mealQualityInput = document.getElementById("mealQuality");
+      const addUnitButton = document.getElementById("addUnitButton");
+      const historyList = document.getElementById("historyList");
+      const calculateButton = document.getElementById("calculateButton");
+
+      addUnitButton.addEventListener("click", function () {
+        const now = new Date();
+        const delta = (now - startTime) / 3600000; // temps écoulé en heures
+        consumptionHistory.push({ time: delta, amount: 10 });
+
+        const li = document.createElement("li");
+        li.textContent = "Unité ajoutée à " + formatTime(now);
+        historyList.appendChild(li);
+      });
+
+      /* 
+      Fonction de calcul globale du BAC à l'instant t (en heures depuis le début) :
+      - Pendant la phase d'absorption (durée t_abs), chaque unité s'absorbe linéairement.
+      - t_abs_total est le moment où la dernière unité est complètement absorbée.
+      - Si t ≤ t_abs_total, le BAC est la somme des quantités absorbées.
+      - Si t > t_abs_total, on prend le BAC total au pic et on soustrait 0.10 g/L par heure depuis t_abs_total.
+    */
+      function calculateTotalBACAtTime(t, weight, r, t_abs) {
+        let t_abs_total = 0;
+        consumptionHistory.forEach((event) => {
+          const finish = event.time + t_abs;
+          if (finish > t_abs_total) t_abs_total = finish;
+        });
+
+        let totalPeak = 0;
+        consumptionHistory.forEach((event) => {
+          totalPeak += event.amount / (weight * r);
+        });
+
+        if (t <= t_abs_total) {
+          let bac = 0;
+          consumptionHistory.forEach((event) => {
+            let dt = t - event.time;
+            let fraction = 0;
+            if (dt <= 0) {
+              fraction = 0;
+            } else if (dt < t_abs) {
+              fraction = dt / t_abs;
+            } else {
+              fraction = 1;
+            }
+            bac += (event.amount * fraction) / (weight * r);
+          });
+          return bac;
+        } else {
+          let eliminationTime = t - t_abs_total;
+          let bac = totalPeak - 0.1 * eliminationTime;
+          return bac < 0 ? 0 : bac;
+        }
+      }
+
+      // Calcul et affichage du tableau BAC par quart d'heure
+      calculateButton.addEventListener("click", function () {
+        const weight = parseFloat(weightInput.value);
+        if (!weight || weight <= 0) {
+          alert("Veuillez entrer un poids valide");
+          return;
+        }
+
+        const alcoholLevelHistory = [];
+
+        const sex = sexInput.value;
+        const mealQuality = parseInt(mealQualityInput.value);
+        const r = sex === "male" ? 0.68 : 0.55;
+
+        let t_abs;
+        switch (mealQuality) {
+          case 1:
+            t_abs = 0.25; // 15 minutes
+            break;
+          case 2:
+            t_abs = 0.5; // 30 minutes
+            break;
+          case 3:
+            t_abs = 0.75; // 45 minutes
+            break;
+          default:
+            t_abs = 1; // 60 minutes
+        }
+
+        let totalPeak = 0;
+        consumptionHistory.forEach((event) => {
+          totalPeak += event.amount / (weight * r);
+        });
+
+        let t_abs_total = 0;
+        consumptionHistory.forEach((event) => {
+          const finish = event.time + t_abs;
+          if (finish > t_abs_total) t_abs_total = finish;
+        });
+        let maxTime = t_abs_total + totalPeak / 0.1;
+        if (maxTime === 0) {
+          maxTime = 2;
+        }
+
+        for (let t = 0; t <= maxTime; t += 0.25) {
+          const bac = calculateTotalBACAtTime(t, weight, r, t_abs);
+          const simulationTime = new Date(startTime.getTime() + t * 3600000);
+          const roundedTime = roundDownToPreviousQuarter(simulationTime);
+          alcoholLevelHistory.push({ time: roundedTime, bac: bac });
+        }
+
+        drawChart(alcoholLevelHistory);
+      });
+
+      function drawChart(alcoholLevelHistory) {
+        let element = document.getElementById("chart");
+        if (element) {
+          google.charts.load("current", {
+            packages: ["corechart"],
+            language: "fr",
+          });
+          google.charts.setOnLoadCallback(function () {
+            // Création du tableau de données pour Google Charts.
+            // La première colonne sera de type Date.
+            let dataArray = [["Time", "Taux d'alcoolémie"]];
+            for (let i = 0; i < alcoholLevelHistory.length; i++) {
+              let timeValue = alcoholLevelHistory[i].time; // objet Date
+              let bacValue = alcoholLevelHistory[i].bac;
+              dataArray.push([timeValue, bacValue]);
+            }
+
+            var data = google.visualization.arrayToDataTable(dataArray);
+
+            var options = {
+              title: "Taux d'alcoolémie en fonction du temps",
+              curveType: "function",
+              legend: { position: "bottom" },
+              tooltip: {
+                textStyle: {
+                  color: "#333",
+                  fontSize: 14,
+                },
+                isHtml: true,
+              },
+              hAxis: { format: "HH:mm" },
+            };
+
+            let chart = new google.visualization.LineChart(element);
+            chart.draw(data, options);
+          });
+        }
+      }
+    </script>
+  </body>
+</html>
+
+<style>
+  body {
+    font-size: xx-large;
+  }
+</style>
