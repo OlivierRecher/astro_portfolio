@@ -45,22 +45,10 @@
     <div class="flex w-full justify-center my-40">
       <button
         id="addUnitButton"
-        class="bg-red-600 text-white font-bold text-center rounded-full h-96 w-96 py-10 px-5 cursor-pointer"
-        >Ajouter une unité d'alcool (10 g)</button
+        class="bg-red-600 text-white text-3xl font-bold text-center rounded-full h-96 w-96 py-10 px-5 cursor-pointer"
       >
-    </div>
-
-    <div class="history mb-5">
-      <h3>Historique de consommation :</h3>
-      <ul id="historyList"></ul>
-    </div>
-
-    <div class="buttons">
-      <button
-        id="calculateButton"
-        class="bg-red-600 text-white font-bold text-center py-10 px-5 cursor-pointer"
-        >Calculer le tableau BAC par quart d'heure</button
-      >
+        Ajouter une unité d'alcool (10 g)
+      </button>
     </div>
 
     <div id="canvas-holder" style="width:100%">
@@ -71,10 +59,15 @@
       <div id="chart"></div>
     </div>
 
+    <div class="history mt-20">
+      <h3>Historique de consommation :</h3>
+      <ul id="historyList"></ul>
+    </div>
+
     <script type="module">
       import chartjsChartRadialGauge from "https://cdn.skypack.dev/chartjs-chart-radial-gauge@1.1.0";
 
-      /** UTILS*/
+      /** UTILS */
       function formatTime(date) {
         let hours = date.getHours().toString().padStart(2, "0");
         let minutes = date.getMinutes().toString().padStart(2, "0");
@@ -91,34 +84,102 @@
       }
       /** */
 
-      const startTime = new Date();
+      // Utiliser let pour startTime pour pouvoir le modifier lors de la restauration
+      let startTime = new Date();
 
+      // Historique de consommation en mémoire
       const consumptionHistory = [];
+      let actualBloodAlcoholLevel = 0.0;
 
+      // Sélection des éléments du DOM
       const sexInput = document.getElementById("sex");
       const weightInput = document.getElementById("weight");
       const mealQualityInput = document.getElementById("mealQuality");
       const addUnitButton = document.getElementById("addUnitButton");
       const historyList = document.getElementById("historyList");
-      const calculateButton = document.getElementById("calculateButton");
 
+      // Sauvegarde de l'état dans le localStorage
+      function saveState() {
+        localStorage.setItem("startTime", startTime.toISOString());
+        localStorage.setItem("weight", weightInput.value);
+        localStorage.setItem("sex", sexInput.value);
+        localStorage.setItem("mealQuality", mealQualityInput.value);
+        localStorage.setItem(
+          "consumptionHistory",
+          JSON.stringify(consumptionHistory)
+        );
+      }
+
+      // Restauration de l'état depuis le localStorage
+      function loadState() {
+        const storedStartTime = localStorage.getItem("startTime");
+        if (storedStartTime) {
+          startTime = new Date(storedStartTime);
+        } else {
+          startTime = new Date();
+          localStorage.setItem("startTime", startTime.toISOString());
+        }
+
+        const storedWeight = localStorage.getItem("weight");
+        if (storedWeight) weightInput.value = storedWeight;
+
+        const storedSex = localStorage.getItem("sex");
+        if (storedSex) sexInput.value = storedSex;
+
+        const storedMealQuality = localStorage.getItem("mealQuality");
+        if (storedMealQuality) mealQualityInput.value = storedMealQuality;
+
+        const storedConsumptionHistory =
+          localStorage.getItem("consumptionHistory");
+        if (storedConsumptionHistory) {
+          const parsedHistory = JSON.parse(storedConsumptionHistory);
+          parsedHistory.forEach((entry) => {
+            consumptionHistory.push(entry);
+            // Reconstruction de l'heure d'ajout en fonction de startTime et du delta
+            const entryTime = new Date(
+              startTime.getTime() + entry.time * 3600000
+            );
+            const li = document.createElement("li");
+            li.textContent = "Unité ajoutée à " + formatTime(entryTime);
+            historyList.appendChild(li);
+          });
+        }
+      }
+
+      // Mise à jour du localStorage lors d'un changement dans les inputs
+      sexInput.addEventListener("change", () => {
+        saveState();
+        calculateBloodAlcoholLevel();
+      });
+      weightInput.addEventListener("change", () => {
+        saveState();
+        calculateBloodAlcoholLevel();
+      });
+      mealQualityInput.addEventListener("change", () => {
+        saveState();
+        calculateBloodAlcoholLevel();
+      });
+
+      // Ajout d'une unité d'alcool
       addUnitButton.addEventListener("click", function () {
         const now = new Date();
-        const delta = (now - startTime) / 3600000; // temps écoulé en heures
+        const delta = (now - startTime) / 3600000; // temps écoulé en heures depuis la date de début
         consumptionHistory.push({ time: delta, amount: 10 });
+        saveState();
 
         const li = document.createElement("li");
         li.textContent = "Unité ajoutée à " + formatTime(now);
         historyList.appendChild(li);
+        calculateBloodAlcoholLevel();
       });
 
       /* 
-      Fonction de calcul globale du BAC à l'instant t (en heures depuis le début) :
+      Calcul global du BAC à l'instant t (en heures depuis la date de début) :
       - Pendant la phase d'absorption (durée t_abs), chaque unité s'absorbe linéairement.
       - t_abs_total est le moment où la dernière unité est complètement absorbée.
       - Si t ≤ t_abs_total, le BAC est la somme des quantités absorbées.
-      - Si t > t_abs_total, on prend le BAC total au pic et on soustrait 0.10 g/L par heure depuis t_abs_total.
-    */
+      - Si t > t_abs_total, on part du BAC total au pic et on soustrait 0.10 g/L par heure depuis t_abs_total.
+      */
       function calculateTotalBACAtTime(t, weight, r, t_abs) {
         let t_abs_total = 0;
         consumptionHistory.forEach((event) => {
@@ -154,7 +215,7 @@
       }
 
       // Calcul et affichage du tableau BAC par quart d'heure
-      calculateButton.addEventListener("click", function () {
+      function calculateBloodAlcoholLevel() {
         const weight = parseFloat(weightInput.value);
         if (!weight || weight <= 0) {
           alert("Veuillez entrer un poids valide");
@@ -162,7 +223,6 @@
         }
 
         const alcoholLevelHistory = [];
-
         const sex = sexInput.value;
         const mealQuality = parseInt(mealQualityInput.value);
         const r = sex === "male" ? 0.68 : 0.55;
@@ -199,13 +259,32 @@
 
         for (let t = 0; t <= maxTime; t += 0.25) {
           const bac = calculateTotalBACAtTime(t, weight, r, t_abs);
+          // On utilise la date de début stockée pour le calcul de l'heure de simulation
           const simulationTime = new Date(startTime.getTime() + t * 3600000);
           const roundedTime = roundDownToPreviousQuarter(simulationTime);
           alcoholLevelHistory.push({ time: roundedTime, bac: bac });
         }
+        // Sélection de la dernière valeur dont l'heure est passée
+        actualBloodAlcoholLevel = alcoholLevelHistory
+          .filter((entry) => entry.time <= new Date())
+          .slice(-1)[0].bac;
 
+        updateGauge();
         drawChart(alcoholLevelHistory);
-      });
+      }
+
+      // Mise à jour de la jauge avec le taux d'alcoolémie actuel
+      function updateGauge() {
+        if (window.myRadialGauge) {
+          window.myRadialGauge.data.datasets[0].data = [
+            actualBloodAlcoholLevel,
+          ];
+          window.myRadialGauge.options.centerArea.text =
+            actualBloodAlcoholLevel;
+          window.myRadialGauge.update();
+          console.log(window.myRadialGauge.options.centerArea.text);
+        }
+      }
 
       function drawChart(alcoholLevelHistory) {
         let element = document.getElementById("chart");
@@ -215,14 +294,10 @@
             language: "fr",
           });
           google.charts.setOnLoadCallback(function () {
-            // Création du tableau de données pour Google Charts.
-            // La première colonne sera de type Date.
             let dataArray = [["Time", "Taux d'alcoolémie"]];
-            for (let i = 0; i < alcoholLevelHistory.length; i++) {
-              let timeValue = alcoholLevelHistory[i].time; // objet Date
-              let bacValue = alcoholLevelHistory[i].bac;
-              dataArray.push([timeValue, bacValue]);
-            }
+            alcoholLevelHistory.forEach((entry) => {
+              dataArray.push([entry.time, entry.bac]);
+            });
 
             var data = google.visualization.arrayToDataTable(dataArray);
 
@@ -231,13 +306,11 @@
               curveType: "function",
               legend: { position: "bottom" },
               tooltip: {
-                textStyle: {
-                  color: "#333",
-                  fontSize: 14,
-                },
+                textStyle: { color: "#333", fontSize: 14 },
                 isHtml: true,
               },
-              hAxis: { format: "HH:mm" },
+              // On définit le début de l'axe horizontal avec la date de début
+              hAxis: { format: "HH:mm", viewWindow: { min: startTime } },
             };
 
             let chart = new google.visualization.LineChart(element);
@@ -246,17 +319,14 @@
         }
       }
 
-      const value = 4.22;
-
-      var ctx = document.getElementById("chart-area").getContext("2d");
-
+      // Configuration initiale de la jauge
       var config = {
         type: "radialGauge",
         data: {
           labels: ["Metrics"],
           datasets: [
             {
-              data: [value],
+              data: [actualBloodAlcoholLevel],
               backgroundColor: ["#e74c3c"],
               borderWidth: 2,
               label: "Score",
@@ -270,21 +340,30 @@
           legend: {},
           title: {
             display: true,
-            text: "Radial gauge chart",
+            text: "Taux d'alcoolémie",
           },
           centerArea: {
-            text: value,
+            text: actualBloodAlcoholLevel,
             subText: "g/L",
           },
           centerPercentage: 80,
         },
       };
 
+      // Au chargement de la page : restauration de l'état, création de la jauge et calcul initial
       window.onload = function () {
+        loadState();
         var ctx = document.getElementById("chart-area").getContext("2d");
         window.myRadialGauge = new Chart(ctx, config);
+        if (weightInput.value) calculateBloodAlcoholLevel();
       };
-      // window.myRadialGauge.update();
+
+      // Mise à jour périodique pour recalculer le BAC (toutes les 10 secondes ici)
+      setInterval(() => {
+        if (weightInput.value) {
+          calculateBloodAlcoholLevel();
+        }
+      }, 10000);
     </script>
   </body>
 </html>
