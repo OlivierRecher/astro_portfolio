@@ -42,10 +42,10 @@
       <label> (1: pas manger, 4: très bien manger) </label>
     </form>
 
-    <div class="m-5">
+    <div class="flex w-full justify-center my-40">
       <button
         id="addUnitButton"
-        class="bg-red-600 text-white font-bold text-center py-10 px-5 cursor-pointer"
+        class="bg-red-600 text-white font-bold text-center rounded-full h-96 w-96 py-10 px-5 cursor-pointer"
         >Ajouter une unité d'alcool (10 g)</button
       >
     </div>
@@ -63,11 +63,17 @@
       >
     </div>
 
+    <div id="canvas-holder" style="width:100%">
+      <canvas id="chart-area"></canvas>
+    </div>
+
     <div class="chartContent">
       <div id="chart"></div>
     </div>
 
     <script type="module">
+      import chartjsChartRadialGauge from "https://cdn.skypack.dev/chartjs-chart-radial-gauge@1.1.0";
+
       /** UTILS*/
       function formatTime(date) {
         let hours = date.getHours().toString().padStart(2, "0");
@@ -239,12 +245,46 @@
           });
         }
       }
+
+      const value = 4.22;
+
+      var ctx = document.getElementById("chart-area").getContext("2d");
+
+      var config = {
+        type: "radialGauge",
+        data: {
+          labels: ["Metrics"],
+          datasets: [
+            {
+              data: [value],
+              backgroundColor: ["#e74c3c"],
+              borderWidth: 2,
+              label: "Score",
+            },
+          ],
+        },
+        options: {
+          domain: [0, 5],
+          trackColor: "rgb(204, 221, 238)",
+          responsive: true,
+          legend: {},
+          title: {
+            display: true,
+            text: "Radial gauge chart",
+          },
+          centerArea: {
+            text: value,
+            subText: "g/L",
+          },
+          centerPercentage: 80,
+        },
+      };
+
+      window.onload = function () {
+        var ctx = document.getElementById("chart-area").getContext("2d");
+        window.myRadialGauge = new Chart(ctx, config);
+      };
+      // window.myRadialGauge.update();
     </script>
   </body>
 </html>
-
-<style>
-  body {
-    font-size: xx-large;
-  }
-</style>
